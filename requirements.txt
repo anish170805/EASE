@@ -1,0 +1,14 @@
+livekit
+livekit-agents
+livekit-plugins-groq
+
+langgraph
+langchain
+langchain-core
+langchain-groq
+groq
+
+python-dotenv
+pydantic
+
+aiohttp
