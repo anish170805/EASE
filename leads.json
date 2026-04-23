@@ -64,5 +64,16 @@
     "timeline": "next week",
     "contact": "anish@gmail.com",
     "priority": "high"
+  },
+  {
+    "captured_at": "2026-04-23T10:45:18.003552+00:00",
+    "lead_score": 61,
+    "priority": "medium",
+    "name": "Anish",
+    "company": "Zenith",
+    "service": "ecommerce",
+    "budget": "1 lakh",
+    "timeline": "2 months",
+    "contact": "anish@gmail.com"
   }
 ]
