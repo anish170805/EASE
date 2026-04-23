@@ -1,14 +1,14 @@
 from langchain_groq import ChatGroq
 from config import config
 
-# llama-3.1-8b-instant: 131k context, 500k TPD on free tier.
-# Temperature 0.1 for extraction calls (lower = more deterministic JSON,
-# fewer hallucinated field values that could overwrite valid lead data).
+# llama-3.3-70b-versatile: much stronger instruction following than 8b-instant.
+# Still free tier on Groq. Handles natural conversation, extraction, and JSON
+# reliably in a single pass without the compounding errors of the smaller model.
 llm = ChatGroq(
     groq_api_key=config.GROQ_API_KEY,
-    model_name="llama-3.1-8b-instant",
-    temperature=0.1,   # FIX Bug 7: was 0.3 — lower temp reduces hallucinated extractions
-    max_tokens=256,
+    model_name="llama-3.3-70b-versatile",
+    temperature=0.15,
+    max_tokens=350,
 )
 
-print("ChatGroq LLM initialised: llama-3.1-8b-instant (temp=0.1)")
+print("ChatGroq LLM initialised: llama-3.3-70b-versatile (temp=0.15, max_tokens=350)")

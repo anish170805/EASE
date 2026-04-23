@@ -1,29 +1,13 @@
-from typing import TypedDict, List, Optional, Dict
-
-
-class LeadData(TypedDict, total=False):
-    name: Optional[str]
-    company: Optional[str]
-    service: Optional[str]
-    budget: Optional[str]
-    timeline: Optional[str]
-    contact: Optional[str]
+from typing import TypedDict, List, Dict, Any
 
 
 class AgentState(TypedDict):
-    user_text:            str
+    user_text: str
     conversation_history: List[Dict[str, str]]
-    extracted_fields:     LeadData
-    lead_data:            LeadData
-    agent_response:       str
-    next_node:            str   # "done" | "closing"
-
-    # Closing flow stage:
-    #   ""             → normal collection
-    #   "confirming"   → waiting for user to confirm summary
-    #   "asking_else"  → waiting for "anything else?" answer
-    #   "done"         → conversation fully closed
-    closing_stage: str
-
-    # STT buffer (managed in agent.py, not used by graph nodes)
+    extracted_fields: Dict[str, Any]
+    lead_data: Dict[str, Any]
+    agent_response: str
+    next_node: str          # "done" | "closing"
+    closing_stage: str      # "" | "confirming" | "asking_else" | "done"
     stt_buffer: str
+    contact_refused: bool   # True if user explicitly declined to share contact

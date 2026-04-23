@@ -9,5 +9,60 @@
     "timeline": "next month",
     "contact": "y b c dot at dot com",
     "priority": "medium"
+  },
+  {
+    "captured_at": "2026-04-23T08:47:38.149950+00:00",
+    "lead_score": 95,
+    "name": "Anish",
+    "company": "Zenix",
+    "service": "ecommerce website",
+    "budget": "one lakh a week",
+    "timeline": "after a month",
+    "contact": "Anish at g mail dot com.",
+    "priority": "medium"
+  },
+  {
+    "captured_at": "2026-04-23T09:10:45.499018+00:00",
+    "lead_score": 100,
+    "name": "Anish",
+    "company": "Zenith",
+    "service": "AI automation",
+    "budget": "1 lakh",
+    "timeline": "next week",
+    "contact": "anish@g.mail.dot.com",
+    "priority": "high"
+  },
+  {
+    "captured_at": "2026-04-23T09:22:14.917773+00:00",
+    "lead_score": 100,
+    "name": "Anish",
+    "company": "Zenith",
+    "service": "CRM/ERP",
+    "budget": "10,000",
+    "timeline": "next month",
+    "contact": "anil@gmail.com",
+    "priority": "high"
+  },
+  {
+    "captured_at": "2026-04-23T09:22:42.974695+00:00",
+    "lead_score": 100,
+    "name": "Anish",
+    "company": "Zenith",
+    "service": "CRM/ERP",
+    "budget": "10,000",
+    "timeline": "next month",
+    "contact": "anish@gmail.com",
+    "priority": "high"
+  },
+  {
+    "captured_at": "2026-04-23T09:41:15.464333+00:00",
+    "lead_score": 100,
+    "name": "Amanish",
+    "company": "Zenith",
+    "service": "AI automation",
+    "budget": "10,000",
+    "timeline": "next week",
+    "contact": "anish@gmail.com",
+    "priority": "high"
   }
 ]

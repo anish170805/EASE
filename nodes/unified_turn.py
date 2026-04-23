@@ -1,21 +1,6 @@
-"""
-unified_turn.py
----------------
-Single LLM call per user turn: extracts fields, generates response, determines next step.
-
-Fixes applied
--------------
-Bug 4: extraction is scoped to the LATEST USER MESSAGE only — history is
-       used as read-only context but the LLM is explicitly told not to
-       re-extract from it.
-Bug 5: merge loop guards `if value` (falsy check) not just `if value is not None`,
-       so empty strings from a hallucinating LLM can't overwrite valid data.
-Bug 7: COLLECTED fields are injected as a machine-readable FORBIDDEN list so
-       even a small LLM can't accidentally ask for them.
-"""
-
 import json
 import re
+
 from state import AgentState
 from services.llm import llm
 from utils.lead_schema import LeadSchema, get_missing_fields
@@ -24,10 +9,18 @@ from utils.lead_schema import LeadSchema, get_missing_fields
 CONTACT_INTENT_PHRASES = [
     "you can email me", "email me", "you can reach me", "reach me at",
     "contact me", "my email", "my phone", "call me", "send me",
-    "you can call", "here is my", "here's my",
+    "you can call", "here is my", "here's my", "my mail", "my number",
 ]
 
-# Human-readable question hints for each missing field
+CONTACT_REFUSAL_PHRASES = [
+    "don't want to share", "dont want to share", "not comfortable",
+    "prefer not", "rather not", "no email", "no phone", "no contact",
+    "won't share", "wont share", "don't want to give", "dont want to give",
+    "keep it private", "not sharing", "skip that", "skip it",
+    "i'd rather not", "id rather not", "no thanks", "don't have",
+    "dont have", "not interested in sharing",
+]
+
 FIELD_QUESTIONS = {
     "name":     "their first name",
     "company":  "the company or organisation they represent",
@@ -37,58 +30,135 @@ FIELD_QUESTIONS = {
     "contact":  "their email address or phone number for follow-up",
 }
 
-SYSTEM = """\
-You are Eera, a professional sales assistant from Zenx on a real-time voice call.
-Your only job is to collect the information listed in STILL MISSING and qualify the lead.
+BUDGET_KEYWORDS = [
+    "lakh", "lakhs", "k", "thousand", "million", "crore", "usd", "inr",
+    "dollar", "rupee", "rupees", "rs", "$", "£", "€", "budget", "around",
+    "approximately", "roughly", "week", "month", "year",
+]
 
-━━━ STRICT RULES ━━━
-1. ALWAYS acknowledge what the user just said in 1 short sentence before asking anything.
-2. Your next question MUST be about the first item in STILL MISSING — nothing else.
-   Do NOT ask about role, department, team size, industry, or anything not in STILL MISSING.
-3. NEVER ask for a field that appears in COLLECTED or FORBIDDEN QUESTIONS.
-4. Ask ONE question only. Keep the total reply to 2 short sentences maximum.
-5. Sound natural and warm — not like a form.
-6. If the user signals contact intent ("you can email me") without giving the address,
-   ask specifically: "Sure, what's the best email or number to reach you?"
+# ── Extraction prompt ─────────────────────────────────────────────────────────
 
-━━━ EXTRACTION RULES ━━━
-- Extract ONLY from LATEST USER MESSAGE — do NOT re-extract from CONVERSATION HISTORY.
-- Set a field to null unless the user EXPLICITLY states it in the LATEST message.
-- Never guess or infer. Never extract from previous turns.
+EXTRACTION_PROMPT = """\
+Extract lead fields from the user message. Return ONLY a JSON object, nothing else.
 
-━━━ ABOUT ZENX ━━━
-Zenx builds: websites, e-commerce stores, CRM/ERP software, AI automation, mobile apps.
-Pricing depends on scope — quotes given after a full discussion.
+RULES:
+- Extract ONLY from USER MESSAGE — not from history.
+- Set field to null if not clearly stated. Never guess.
+- budget: extract amount + unit ("1 lakh", "50k"). If STT garbled (e.g. "one leg"), return null.
+- contact: only if full email or phone given. "my email"/"my phone" without value → null.
+- name: person's name only, not the word "name".
+- service: normalise to one of: website, ecommerce, CRM/ERP, AI automation, mobile app.
 
-━━━ OUTPUT FORMAT ━━━
-Respond with ONLY this JSON object — no markdown, no extra text:
-{
-  "extracted": {
-    "name": null,
-    "company": null,
-    "service": null,
-    "budget": null,
-    "timeline": null,
-    "contact": null
-  },
-  "intent": "collecting",
-  "response": "Eera's spoken reply here"
-}
+EXAMPLES:
+"My name is Anish, I work at Zenix" → {{"name":"Anish","company":"Zenix","service":null,"budget":null,"timeline":null,"contact":null}}
+"budget around one lakh a month" → {{"name":null,"company":null,"service":null,"budget":"1 lakh/month","timeline":null,"contact":null}}
+"one leg" → {{"name":null,"company":null,"service":null,"budget":null,"timeline":null,"contact":null}}
+"my mail" → {{"name":null,"company":null,"service":null,"budget":null,"timeline":null,"contact":null}}
+"anish@acme.com" → {{"name":null,"company":null,"service":null,"budget":null,"timeline":null,"contact":"anish@acme.com"}}
+"I need a website in 2 months" → {{"name":null,"company":null,"service":"website","budget":null,"timeline":"2 months","contact":null}}
 
-Field rules:
-- "extracted": set ONLY fields explicitly stated in LATEST USER MESSAGE (null for everything else)
-- "intent": "collecting" always unless user asks a general question about Zenx/pricing ("answering")
-- "response": acknowledge first, then ask about the FIRST item in STILL MISSING
-"""
+HISTORY (context only):
+{history}
+
+USER MESSAGE:
+{user_text}
+
+JSON:"""
+
+# ── Response prompt ───────────────────────────────────────────────────────────
+
+RESPONSE_PROMPT = """\
+You are Eera, a warm and natural sales assistant from Zenx on a real-time voice call.
+Talk like a real human — not a form-filler, not a robot.
+
+ABOUT ZENX: builds websites, e-commerce, CRM/ERP, AI automation, mobile apps. Pricing by scope.
+
+RULES:
+- Respond to whatever the user said naturally first, THEN ask the next missing field.
+- Ask only ONE field at a time — always the first item in STILL MISSING.
+- NEVER ask for anything in FORBIDDEN LIST.
+- Max 2 short sentences total.
+- Do NOT start with the user's name every time. Use it at most once in the whole conversation.
+- Do NOT re-introduce yourself after the first message.
+- If user asks about private info (owner details, salaries, revenue, client data) → decline warmly and redirect.
+- If user asks about Zenx services or pricing → answer briefly and move forward.
+- If user seems hesitant → acknowledge, don't push hard.
+- If clarification hint given → use it, don't ask from scratch.
+
+CONVERSATION HISTORY:
+{history}
+
+USER JUST SAID:
+{user_text}
+
+COLLECTED:
+{collected}
+
+FORBIDDEN (never ask):
+{forbidden}
+
+STILL MISSING (ask #1 next):
+{missing}
+
+{clarification_hint}
+Eera:"""
 
 
-def _parse_json_response(raw: str) -> dict:
-    """Robustly extract the JSON block from LLM output."""
+# ── Validators ────────────────────────────────────────────────────────────────
+
+def _validate_extracted(extracted: dict) -> tuple[dict, list]:
+    clean, failed = {}, []
+
+    for key, value in extracted.items():
+        if value is None:
+            clean[key] = None
+            continue
+
+        val = str(value).strip()
+
+        if key == "name":
+            if len(val) < 2 or val.lower() in {"i", "me", "my", "name", "the"}:
+                clean[key] = None
+                failed.append(key)
+                continue
+
+        elif key == "budget":
+            has_digit   = any(c.isdigit() for c in val)
+            has_keyword = any(kw in val.lower() for kw in BUDGET_KEYWORDS)
+            if not has_digit and not has_keyword:
+                clean[key] = None
+                failed.append(key)
+                continue
+
+        elif key == "contact":
+            is_email = re.search(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}", val)
+            is_phone = re.search(r"[\d\s\-\+\(\)]{7,}", val)
+            if not is_email and not is_phone:
+                clean[key] = None
+                failed.append(key)
+                continue
+
+        elif key == "timeline":
+            time_words = [
+                "day", "week", "month", "year", "asap", "soon", "quarter",
+                "sprint", "immediately", "urgent", "flexible", "later",
+            ]
+            if not any(w in val.lower() for w in time_words) and not any(c.isdigit() for c in val):
+                clean[key] = None
+                failed.append(key)
+                continue
+
+        clean[key] = val
+
+    return clean, failed
+
+
+def _parse_json(raw: str) -> dict:
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
         pass
-    match = re.search(r'\{.*\}', raw, re.DOTALL)
+    match = re.search(r"\{.*\}", raw, re.DOTALL)
     if match:
         try:
             return json.loads(match.group())
@@ -97,102 +167,132 @@ def _parse_json_response(raw: str) -> dict:
     return {}
 
 
+def _is_contact_refusal(text: str) -> bool:
+    return any(phrase in text.lower() for phrase in CONTACT_REFUSAL_PHRASES)
+
+
+def _build_clarification_hint(user_text: str, missing: list, failed_fields: list) -> str:
+    lower = user_text.lower()
+    hints = []
+
+    if "contact" in missing and any(p in lower for p in CONTACT_INTENT_PHRASES):
+        hints.append(
+            'CLARIFICATION: User wants to share contact but didn\'t give the value. '
+            'Ask: "Sure, go ahead — what\'s the email or number?"'
+        )
+    if "budget" in failed_fields:
+        hints.append(
+            'CLARIFICATION: Budget was unclear (possible voice error). '
+            'Ask: "Sorry, could you repeat the budget amount?"'
+        )
+    if "company" in failed_fields:
+        hints.append(
+            'CLARIFICATION: Company name was unclear. '
+            'Ask: "Just to confirm — what\'s the company name?"'
+        )
+
+    return "\n".join(hints) if hints else ""
+
+
+# ── Main node ─────────────────────────────────────────────────────────────────
+
 def unified_turn(state: AgentState) -> dict:
-    user_text     = state.get("user_text", "").strip()
-    lead_data     = dict(state.get("lead_data", {}))
-    history       = state.get("conversation_history", [])
-    closing_stage = state.get("closing_stage", "")
+    user_text       = state.get("user_text", "").strip()
+    lead_data       = dict(state.get("lead_data", {}))
+    history         = state.get("conversation_history", [])
+    closing_stage   = state.get("closing_stage", "")
+    contact_refused = state.get("contact_refused", False)
 
-    # Already in closing flow — hand off immediately
+    # Already in closing flow
     if closing_stage in ("confirming", "asking_else", "done"):
-        return {"next_node": "closing"}
+        return {"next_node": "closing", "contact_refused": contact_refused}
 
-    # ── Conversation history (last 4 turns — read-only context, NOT for extraction) ─
-    recent = history[-4:] if len(history) > 4 else history
-    history_text = "\n".join(
-        f"User: {h['user']}\nEera: {h['agent']}" for h in recent
-    ) if recent else "None"
+    # Contact refusal — rule-based, no LLM needed
+    if not contact_refused and _is_contact_refusal(user_text):
+        lead = LeadSchema(**lead_data)
+        if "contact" in get_missing_fields(lead):
+            return {
+                "lead_data":       lead_data,
+                "extracted_fields": {},
+                "contact_refused": True,
+                "agent_response":  "No worries at all — we'll proceed without it and be in touch.",
+                "next_node":       "closing",
+                "closing_stage":   closing_stage,
+            }
 
-    # ── Determine what's missing ──────────────────────────────────────────────
-    lead    = LeadSchema(**lead_data)
-    missing = get_missing_fields(lead)
-
-    if not missing:
-        # All fields collected — go straight to closing
-        return {
-            "lead_data":        lead_data,
-            "extracted_fields": {},
-            "agent_response":   "",
-            "next_node":        "closing",
-        }
-
-    # Build a clear, ordered list of what still needs to be collected
-    missing_lines = "\n".join(
-        f"  {i+1}. {f} — {FIELD_QUESTIONS[f]}"
-        for i, f in enumerate(missing)
+    # History context
+    recent = history[-6:] if len(history) > 6 else history
+    history_text = (
+        "\n".join(f"User: {h['user']}\nEera: {h['agent']}" for h in recent)
+        if recent else "None"
     )
 
-    # FIX Bug 7: machine-readable FORBIDDEN list derived from already-collected keys
-    collected_keys = [k for k, v in lead_data.items() if v]
-    if collected_keys:
-        forbidden_block = (
-            "FORBIDDEN QUESTIONS — you already have these, NEVER ask for them again:\n"
-            + "\n".join(f"  - {k} = {lead_data[k]}" for k in collected_keys)
-        )
-    else:
-        forbidden_block = "FORBIDDEN QUESTIONS: none yet"
+    # ── Call 1: Extraction ────────────────────────────────────────────────────
+    raw_extraction = llm.invoke(
+        EXTRACTION_PROMPT.format(history=history_text, user_text=user_text)
+    ).content.strip()
 
-    # Contact intent hint
-    lower = user_text.lower()
-    contact_hint = ""
-    if any(p in lower for p in CONTACT_INTENT_PHRASES) and "contact" in missing:
-        contact_hint = (
-            "\n⚠ IMPORTANT: User signalled they want to share contact info "
-            "but gave no address yet. Ask for their email or phone number NOW."
-        )
+    extracted_clean, failed_fields = _validate_extracted(_parse_json(raw_extraction))
 
-    # ── Single LLM call ───────────────────────────────────────────────────────
-    prompt = f"""{SYSTEM}
-
----
-CONVERSATION HISTORY (context only — do NOT extract from this):
-{history_text}
-
-LATEST USER MESSAGE (extract from THIS only):
-{user_text}
-
-COLLECTED (do NOT ask for these again):
-{lead_data if lead_data else "Nothing yet"}
-
-{forbidden_block}
-
-STILL MISSING (ask about #1 first):
-{missing_lines}
-{contact_hint}
-Respond with the JSON only."""
-
-    raw    = llm.invoke(prompt).content.strip()
-    parsed = _parse_json_response(raw)
-
-    # ── Merge extracted fields ────────────────────────────────────────────────
-    # FIX Bug 5: guard `if value` (not just `if value is not None`) to
-    # prevent empty strings from overwriting valid data.
-    extracted = parsed.get("extracted", {}) or {}
-    for key, value in extracted.items():
-        if value and key in FIELD_QUESTIONS:   # <-- was: `if value is not None`
+    for key, value in extracted_clean.items():
+        if value and key in FIELD_QUESTIONS:
             lead_data[key] = value
 
-    agent_response = (parsed.get("response") or "").strip()
-    if not agent_response:
-        agent_response = "Sorry, could you say that again?"
+    # Compute missing
+    lead    = LeadSchema(**lead_data)
+    missing = get_missing_fields(lead)
+    if contact_refused:
+        missing = [f for f in missing if f != "contact"]
 
-    # ── Re-check completeness after extraction ────────────────────────────────
+    # All done → closing
+    if not missing:
+        return {
+            "lead_data":       lead_data,
+            "extracted_fields": {},
+            "agent_response":  "",
+            "next_node":       "closing",
+            "closing_stage":   closing_stage,
+            "contact_refused": contact_refused,
+        }
+
+    # Build forbidden + missing strings
+    collected_keys = [k for k, v in lead_data.items() if v]
+    if contact_refused and "contact" not in collected_keys:
+        collected_keys.append("contact")
+
+    forbidden_str = (
+        "\n".join(f"- {k}: {lead_data.get(k, 'skipped')}" for k in collected_keys)
+        if collected_keys else "none"
+    )
+    missing_str = "\n".join(
+        f"  {i+1}. {f} — {FIELD_QUESTIONS[f]}" for i, f in enumerate(missing)
+    )
+    clarification_hint = _build_clarification_hint(user_text, missing, failed_fields)
+
+    # ── Call 2: Response ──────────────────────────────────────────────────────
+    agent_response = llm.invoke(
+        RESPONSE_PROMPT.format(
+            history=history_text,
+            user_text=user_text,
+            collected=lead_data if lead_data else "Nothing yet",
+            forbidden=forbidden_str,
+            missing=missing_str,
+            clarification_hint=clarification_hint,
+        )
+    ).content.strip()
+
+    if not agent_response:
+        agent_response = "Sorry, I didn't catch that — could you say it again?"
+
     still_missing = get_missing_fields(LeadSchema(**lead_data))
-    next_node = "closing" if not still_missing else "done"
+    if contact_refused:
+        still_missing = [f for f in still_missing if f != "contact"]
 
     return {
-        "lead_data":        lead_data,
+        "lead_data":       lead_data,
         "extracted_fields": {},
-        "agent_response":   agent_response,
-        "next_node":        next_node,
+        "agent_response":  agent_response,
+        "next_node":       "closing" if not still_missing else "done",
+        "closing_stage":   closing_stage,
+        "contact_refused": contact_refused,
     }
