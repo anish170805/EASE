@@ -3,7 +3,7 @@ import React from 'react';
 
 interface TopBarProps {
   time: string;
-  status: 'Ready' | 'Active';
+  status: 'Ready' | 'Active' | 'Text Mode';
 }
 
 export const TopBar: React.FC<TopBarProps> = ({ time, status }) => {

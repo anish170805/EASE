@@ -93,6 +93,14 @@ class GraphAgent(Agent):
             if response:
                 await self._response_queue.put(response)
                 self.agent_state["agent_response"] = ""
+                # Broadcast response text to frontend for subtitle display
+                if self._room:
+                    try:
+                        import json as _json
+                        payload = _json.dumps({"type": "agent_text", "text": response}).encode("utf-8")
+                        await self._room.local_participant.publish_data(payload, reliable=True)
+                    except Exception as exc:
+                        print(f">>> data publish error: {exc}")
             else:
                 print(">>> WARNING: empty agent_response — skipping enqueue")
 
@@ -109,7 +117,8 @@ class GraphAgent(Agent):
             self._processing = False
 
     async def _graceful_disconnect(self) -> None:
-        await asyncio.sleep(4.5)
+        # Wait long enough for closing TTS to fully play out
+        await asyncio.sleep(12.0)
         if self._room:
             try:
                 print(">>> DISCONNECTING room after graceful close.")
@@ -196,6 +205,22 @@ async def entrypoint(ctx: JobContext) -> None:
         print(f">>> SESSION ERROR: {event.error}")
 
     await session.start(room=ctx.room, agent=agent)
+    agent._session = session  # store ref for graceful disconnect polling
+
+    # ── Listen for text messages from frontend data channel ──────────
+    @ctx.room.on("data_received")
+    def on_data_received(data_packet):
+        try:
+            import json as _json
+            payload = _json.loads(data_packet.data.decode("utf-8"))
+            if payload.get("type") == "user_text":
+                text = payload.get("text", "").strip()
+                if text:
+                    print(f">>> DATA CHANNEL TEXT: '{text}'")
+                    asyncio.create_task(agent._process_user_turn(text))
+        except Exception as exc:
+            print(f">>> data_received parse error: {exc}")
+
     await asyncio.sleep(0.3)
     await session.say(GREETING, allow_interruptions=True)
     print("GREETING DONE — speak now!")
