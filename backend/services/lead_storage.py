@@ -19,6 +19,7 @@ from typing import Dict, Any
 
 from utils.lead_schema import LeadSchema, LeadPriority
 from nodes.finalize_lead import _budget_score, _service_score, _timeline_score
+from services.supabase_storage import save_lead_supabase
 
 LEADS_FILE = os.path.join(os.path.dirname(__file__), "..", "leads.json")
 
@@ -71,6 +72,9 @@ def save_lead(lead_data: Dict[str, Any]) -> Dict[str, Any]:
     leads = _load_leads()
     leads.append(record)
     _save_leads(leads)
+
+    # Dual-write to Supabase (non-blocking fallback — JSON still saved on error)
+    save_lead_supabase(record)
 
     print(f"\n--- LEAD SAVED (score: {score}/100, priority: {record['priority']}) ---")
     print(json.dumps(record, indent=2))

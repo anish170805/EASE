@@ -47,7 +47,6 @@ Information being collected (do not ask for what is already in ALREADY COLLECTED
 - Name, Company, Project/service need, Timeline, Budget, Contact (email or phone)"""
 
 
-# Phrases that indicate user wants to share contact but hasn't yet
 CONTACT_INTENT_PHRASES = [
     "you can email me", "email me", "you can reach me", "reach me at",
     "contact me", "my email", "my phone", "call me", "send me",
@@ -66,7 +65,6 @@ def ask_question(state: AgentState):
     if not missing_fields:
         return {"agent_response": "Thanks, I have all the details I need!"}
 
-    # Build conversation history string (last 6 turns)
     recent = history[-6:] if len(history) > 6 else history
     history_text = "\n".join(
         f"User: {h['user']}\nEera: {h['agent']}" for h in recent
@@ -74,7 +72,6 @@ def ask_question(state: AgentState):
 
     missing_desc = ", ".join(missing_fields)
 
-    # Detect contact intent so the LLM has an explicit hint
     lower = user_text.lower()
     contact_hint = ""
     if any(phrase in lower for phrase in CONTACT_INTENT_PHRASES) and "contact" in missing_fields:

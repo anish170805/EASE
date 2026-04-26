@@ -19,7 +19,7 @@ from config import config
 
 
 GREETING = "Hi, I'm Eera from Zenx. How can I help you today?"
-STT_COMMIT_DELAY = 1.5
+STT_COMMIT_DELAY = 0.8  # seconds to wait for STT to settle before processing
 
 
 def _text_hash(text: str) -> str:
@@ -170,13 +170,13 @@ async def entrypoint(ctx: JobContext) -> None:
             model="nova-3",
             language="en",
             api_key=config.DEEPGRAM_API_KEY,
-            endpointing_ms=800,
+            endpointing_ms=600,
         ),
         tts=deepgram.TTS(
             model="aura-2-iris-en",
             api_key=config.DEEPGRAM_API_KEY,
         ),
-        vad=silero.VAD.load(min_silence_duration=0.8),
+        vad=silero.VAD.load(min_silence_duration=0.6),
     )
 
     @session.on("user_input_transcribed")
@@ -196,7 +196,7 @@ async def entrypoint(ctx: JobContext) -> None:
         print(f">>> SESSION ERROR: {event.error}")
 
     await session.start(room=ctx.room, agent=agent)
-    await asyncio.sleep(1)
+    await asyncio.sleep(0.3)
     await session.say(GREETING, allow_interruptions=True)
     print("GREETING DONE — speak now!")
 

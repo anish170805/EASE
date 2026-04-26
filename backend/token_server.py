@@ -3,7 +3,7 @@ token_server.py
 ---------------
 Lightweight FastAPI server that:
   1. Issues LiveKit JWT tokens for the React frontend
-  2. Serves leads.json data for the dashboard
+  2. Serves leads data for the dashboard (from Supabase, falls back to leads.json)
   3. Handles CORS so the React dev server can talk to it
 
 Run with:
@@ -55,7 +55,16 @@ def get_token(room: str = "sales-room", identity: str = "user"):
 
 @app.get("/leads")
 def get_leads():
-    """Return all captured leads from leads.json."""
+    """Return all captured leads — Supabase first, fallback to leads.json."""
+    try:
+        from services.supabase_storage import get_all_leads_supabase
+        leads = get_all_leads_supabase()
+        if leads:
+            return leads
+    except Exception:
+        pass
+
+    # Fallback: local JSON
     if not os.path.exists(LEADS_FILE):
         return []
     try:
@@ -67,4 +76,4 @@ def get_leads():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("token_server:app", host="0.0.0.0", port=8000, reload=True)
