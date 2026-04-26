@@ -1,5 +1,8 @@
 livekit
 livekit-agents
+livekit-plugins-deepgram
+livekit-plugins-silero
+livekit-plugins-openai
 livekit-plugins-groq
 
 langgraph
