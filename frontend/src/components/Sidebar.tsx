@@ -1,8 +1,11 @@
 'use client';
 import React from 'react';
+import { usePathname } from 'next/navigation';
 
 // Left-side nav — collapsed icon rail, expands on hover (desktop only)
 export const NavRail: React.FC = () => {
+  const pathname = usePathname();
+
   return (
     <nav
       style={{
@@ -14,7 +17,7 @@ export const NavRail: React.FC = () => {
         zIndex: 40,
         display: 'flex',
         flexDirection: 'column',
-        paddingTop: '80px',           // below topbar
+        paddingTop: '80px',
         paddingBottom: '32px',
         background: 'rgba(0,0,0,0.80)',
         backdropFilter: 'blur(32px)',
@@ -29,10 +32,9 @@ export const NavRail: React.FC = () => {
     >
       {/* Nav Items */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '16px', flex: 1 }}>
-        <NavItem icon="graphic_eq" label="Assistant" active />
-        <NavItem icon="receipt_long" label="Archive" />
-        <NavItem icon="query_stats" label="Analytics" />
-        <NavItem icon="face_6" label="Identity" />
+        <NavItem icon="graphic_eq"   label="Assistant" href="/"      active={pathname === '/'}       />
+        <NavItem icon="query_stats"  label="Leads"     href="/leads" active={pathname === '/leads'}  />
+        <NavItem icon="face_6"       label="Identity"  href="#"                                      />
       </div>
 
       {/* Footer */}
@@ -43,8 +45,6 @@ export const NavRail: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           gap: '16px',
-          opacity: 0,
-          transition: 'opacity 300ms ease',
           whiteSpace: 'nowrap',
         }}
       >
@@ -95,7 +95,8 @@ export const NavRail: React.FC = () => {
       </div>
 
       <style>{`
-        .nav-rail:hover .nav-footer { opacity: 1 !important; }
+        .nav-rail .nav-footer { opacity: 0; transition: opacity 300ms ease; }
+        .nav-rail:hover .nav-footer { opacity: 1; }
       `}</style>
     </nav>
   );
@@ -104,13 +105,14 @@ export const NavRail: React.FC = () => {
 interface NavItemProps {
   icon: string;
   label: string;
+  href: string;
   active?: boolean;
 }
 
-const NavItem: React.FC<NavItemProps> = ({ icon, label, active }) => {
+const NavItem: React.FC<NavItemProps> = ({ icon, label, href, active }) => {
   return (
     <a
-      href="#"
+      href={href}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -118,6 +120,7 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, active }) => {
         padding: '16px 0 16px 28px',
         color: active ? 'var(--primary-container)' : 'rgba(255,255,255,0.30)',
         borderLeft: active ? '2px solid var(--primary-container)' : '2px solid transparent',
+        background: active ? 'rgba(0,245,255,0.04)' : 'transparent',
         transition: 'color 200ms ease, background 200ms ease',
         textDecoration: 'none',
         whiteSpace: 'nowrap',
@@ -141,7 +144,7 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, active }) => {
         style={{
           fontSize: '22px',
           flexShrink: 0,
-          fontVariationSettings: "'wght' 200, 'opsz' 24",
+          fontVariationSettings: active ? "'wght' 400, 'opsz' 24" : "'wght' 200, 'opsz' 24",
         }}
       >
         {icon}
@@ -150,7 +153,7 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, active }) => {
         style={{
           fontFamily: "'Space Grotesk', sans-serif",
           fontSize: '11px',
-          fontWeight: 500,
+          fontWeight: active ? 600 : 500,
           letterSpacing: '0.12em',
           textTransform: 'uppercase',
         }}

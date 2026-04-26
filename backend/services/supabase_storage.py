@@ -43,3 +43,14 @@ def get_all_leads_supabase() -> list:
     except Exception as e:
         print(f"[Supabase] ERROR fetching leads: {e}")
         return []
+
+
+def get_lead_by_id_supabase(lead_id: str) -> Dict[str, Any] | None:
+    """Fetch a single lead from Supabase by ID."""
+    try:
+        client = _get_client()
+        resp = client.table("leads").select("*").eq("id", lead_id).single().execute()
+        return resp.data
+    except Exception as e:
+        print(f"[Supabase] ERROR fetching lead {lead_id}: {e}")
+        return None

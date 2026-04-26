@@ -96,6 +96,31 @@ def get_leads():
         return []
 
 
+@app.get("/leads/{lead_id}")
+def get_lead(lead_id: str):
+    try:
+        from services.supabase_storage import get_lead_by_id_supabase
+        lead = get_lead_by_id_supabase(lead_id)
+        if lead:
+            return lead
+    except Exception as e:
+        print(f"Error fetching lead: {e}")
+    
+    # Fallback to local JSON if not found in Supabase
+    if os.path.exists(LEADS_FILE):
+        try:
+            with open(LEADS_FILE, "r", encoding="utf-8") as f:
+                leads = json.load(f)
+                # Find by id (string or int)
+                for l in leads:
+                    if str(l.get("id")) == lead_id:
+                        return l
+        except Exception:
+            pass
+            
+    raise HTTPException(status_code=404, detail="Lead not found")
+
+
 class ChatRequest(BaseModel):
     message: str
     session_id: str = "default"
