@@ -28,9 +28,22 @@ LEADS_FILE         = os.path.join(os.path.dirname(__file__), "leads.json")
 
 app = FastAPI()
 
+cors_allow_origins = [
+    o.strip()
+    for o in os.getenv(
+        "CORS_ALLOW_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000,https://ease-weld.vercel.app",
+    ).split(",")
+    if o.strip()
+]
+# Allow Vercel preview + production domains by default.
+cors_allow_origin_regex = os.getenv("CORS_ALLOW_ORIGIN_REGEX", r"https://.*\.vercel\.app")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_allow_origins,
+    allow_origin_regex=cors_allow_origin_regex,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

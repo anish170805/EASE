@@ -4,6 +4,9 @@ Eera is a real-time voice sales assistant that captures, qualifies, and stores l
 
 It combines LiveKit audio streaming, Deepgram STT/TTS, LangGraph state orchestration, Groq LLM reasoning, and a Next.js dashboard.
 
+Live: https://ease-weld.vercel.app/
+Backend: https://eera-yni0.onrender.com/
+
 ## What It Does
 - Runs a live voice conversation with a prospect
 - Extracts structured lead fields turn-by-turn
@@ -198,6 +201,34 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+## Deployment
+### Backend (Render - single service)
+This repo supports running the API + voice agent in one Render Web Service via `backend/run_all.py` (FastAPI + agent subprocess).
+
+Render settings:
+- Root Directory: `backend`
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `python run_all.py`
+- Health Check Path: `/leads`
+
+Backend env vars (single service):
+- `LIVEKIT_URL`
+- `LIVEKIT_API_KEY`
+- `LIVEKIT_API_SECRET`
+- `DEEPGRAM_API_KEY`
+- `GROQ_API_KEY`
+- `SUPABASE_URL` (optional, recommended)
+- `SUPABASE_KEY` (optional, recommended)
+- `CORS_ALLOW_ORIGINS` (set to your Vercel URL, e.g. `https://ease-weld.vercel.app`)
+- `CORS_ALLOW_ORIGIN_REGEX` (optional, defaults to `https://.*\.vercel\.app`)
+
+Important: keep this Render service at 1 instance (no scaling) so only one voice agent joins the LiveKit room.
+
+### Frontend (Vercel)
+Vercel settings:
+- Root Directory: `frontend`
+- Env var: `NEXT_PUBLIC_BACKEND_URL=https://eera-yni0.onrender.com`
+
 ## Environment Variables
 Backend `.env`:
 - `LIVEKIT_URL`
@@ -207,6 +238,8 @@ Backend `.env`:
 - `DEEPGRAM_API_KEY`
 - `SUPABASE_URL`
 - `SUPABASE_KEY`
+- `CORS_ALLOW_ORIGINS` (optional)
+- `CORS_ALLOW_ORIGIN_REGEX` (optional)
 
 Frontend `.env.local`:
 - `NEXT_PUBLIC_BACKEND_URL` (default `http://localhost:8000`)
