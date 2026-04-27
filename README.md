@@ -17,7 +17,10 @@ Backend: https://eera-yni0.onrender.com/
 
 ## Demo Video & Screenshots
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/xio-5saNfHs" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+### Watch the demo video
+
+[![Watch the video](https://img.youtube.com/vi/xio-5saNfHs/0.jpg)](https://www.youtube.com/watch?v=xio-5saNfHs)
+
 
 If the embed does not render in your viewer, open the video directly:
 - https://youtu.be/xio-5saNfHs
