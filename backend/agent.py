@@ -9,6 +9,7 @@ from livekit.agents import (
     AgentSession,
     JobContext,
     WorkerOptions,
+    JobExecutorType,
     cli,
     llm,
     ModelSettings,
@@ -243,4 +244,12 @@ if __name__ == "__main__":
     # When an agent_name is set, LiveKit can explicitly dispatch this worker into rooms.
     # Keep it stable across deploys so the token-server can request dispatch by name.
     agent_name = os.getenv("LIVEKIT_AGENT_NAME", "eera")
-    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, agent_name=agent_name))
+    # Use THREAD executor to avoid process-spawn issues on some PaaS containers.
+    cli.run_app(
+        WorkerOptions(
+            entrypoint_fnc=entrypoint,
+            agent_name=agent_name,
+            job_executor_type=JobExecutorType.THREAD,
+            num_idle_processes=0,
+        )
+    )

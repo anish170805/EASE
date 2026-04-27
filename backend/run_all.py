@@ -7,7 +7,8 @@ import sys
 
 def _start_agent_subprocess() -> subprocess.Popen:
     # Run the LiveKit agent as a separate process so it can block / manage its own event loop.
-    cmd = [sys.executable, "agent.py", "dev"]
+    # Use "start" for production (no hot reload).
+    cmd = [sys.executable, "agent.py", "start"]
     return subprocess.Popen(cmd, cwd=os.path.dirname(__file__))
 
 
@@ -34,4 +35,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
