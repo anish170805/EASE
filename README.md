@@ -15,6 +15,19 @@ Backend: https://eera-yni0.onrender.com/
 - Persists leads to local JSON and Supabase
 - Shows all captured leads in a dashboard with detail pages
 
+## Demo Video & Screenshots
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/xio-5saNfHs" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+
+If the embed does not render in your viewer, open the video directly:
+- https://youtu.be/xio-5saNfHs
+
+### Screenshots
+
+<img src="assets/demo-leads.png" alt="Eera lead dashboard screenshot" width="720" />
+
+<img src="assets/demo-call.png" alt="Eera voice call UI screenshot" width="720" />
+
 ## Tech Stack
 - Backend: Python, LiveKit Agents, LangGraph, LangChain Groq, FastAPI, Supabase SDK
 - Frontend: Next.js (App Router), React, livekit-client
@@ -247,3 +260,5 @@ Frontend `.env.local`:
 ## Notes
 - Current LangGraph uses `unified_turn -> (closing|update_history)` as active path.
 - Lead storage is fault-tolerant: JSON saves even if Supabase fails.
+
+
