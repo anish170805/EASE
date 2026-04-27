@@ -81,13 +81,31 @@ def _get_graph():
 def get_token(room: str = "sales-room", identity: str = "user"):
     if not LIVEKIT_API_KEY or not LIVEKIT_API_SECRET:
         raise HTTPException(status_code=500, detail="LiveKit credentials not set")
-    token = (
+
+    # Dispatch the named agent into the room when the participant joins.
+    # Requires a matching LIVEKIT_AGENT_NAME on the worker.
+    agent_name = os.getenv("LIVEKIT_AGENT_NAME", "eera")
+    room_config = None
+    try:
+        from livekit.api import RoomAgentDispatch, RoomConfiguration  # type: ignore
+        room_config = RoomConfiguration(
+            agents=[RoomAgentDispatch(agent_name=agent_name)]
+        )
+    except Exception:
+        # Older SDK versions may not support RoomConfiguration-based dispatch.
+        # In that case, the agent must be dispatched via API or automatic dispatch settings.
+        room_config = None
+
+    token_builder = (
         AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
         .with_identity(identity)
         .with_name(identity)
         .with_grants(VideoGrants(room_join=True, room=room))
-        .to_jwt()
     )
+    if room_config:
+        token_builder = token_builder.with_room_config(room_config)
+
+    token = token_builder.to_jwt()
     return {"token": token, "url": LIVEKIT_URL, "room": room}
 
 

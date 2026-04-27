@@ -1,6 +1,7 @@
 import uuid
 import asyncio
 import hashlib
+import os
 from typing import AsyncIterable
 
 from livekit.agents import (
@@ -239,4 +240,7 @@ async def entrypoint(ctx: JobContext) -> None:
 
 
 if __name__ == "__main__":
-    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
+    # When an agent_name is set, LiveKit can explicitly dispatch this worker into rooms.
+    # Keep it stable across deploys so the token-server can request dispatch by name.
+    agent_name = os.getenv("LIVEKIT_AGENT_NAME", "eera")
+    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, agent_name=agent_name))
