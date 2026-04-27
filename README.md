@@ -4,8 +4,9 @@ Eera is a real-time voice sales assistant that captures, qualifies, and stores l
 
 It combines LiveKit audio streaming, Deepgram STT/TTS, LangGraph state orchestration, Groq LLM reasoning, and a Next.js dashboard.
 
-Live: https://ease-weld.vercel.app/
-Backend: https://eera-yni0.onrender.com/
+Live app: https://ease-weld.vercel.app/
+
+Leads dashboard: https://ease-weld.vercel.app/leads
 
 ## What It Does
 - Runs a live voice conversation with a prospect
@@ -263,5 +264,4 @@ Frontend `.env.local`:
 ## Notes
 - Current LangGraph uses `unified_turn -> (closing|update_history)` as active path.
 - Lead storage is fault-tolerant: JSON saves even if Supabase fails.
-
 
