@@ -170,7 +170,7 @@ async def entrypoint(ctx: JobContext) -> None:
     )
 
     groq_llm = livekit_openai.LLM(
-        model="llama-3.1-8b-instant",
+        model="openai/gpt-oss-20b",
         api_key=config.GROQ_API_KEY,
         base_url="https://api.groq.com/openai/v1",
     )
