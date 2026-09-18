@@ -6,9 +6,9 @@ from config import config
 # reliably in a single pass without the compounding errors of the smaller model.
 llm = ChatGroq(
     groq_api_key=config.GROQ_API_KEY,
-    model_name="llama-3.3-70b-versatile",
+    model_name="openai/gpt-oss-20b",
     temperature=0.15,
     max_tokens=350,
 )
 
-print("ChatGroq LLM initialised: llama-3.3-70b-versatile (temp=0.15, max_tokens=350)")
+print("ChatGroq LLM initialised: openai/gpt-oss-20b (temp=0.15, max_tokens=350)")
